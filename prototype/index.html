@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PropRent – Online Rental & Property Sales</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="index.html" class="logo">Prop<span>Rent</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html" class="active">Home</a>
+      <a href="properties.html?listing=rent">Rent</a>
+      <a href="properties.html?listing=sale">Buy</a>
+      <a href="properties.html">All Listings</a>
+      <span id="authLinks"></span>
+    </div>
+    <div class="hamburger" id="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <h1>Find Your Perfect<br><span>Home or Investment</span></h1>
+    <p>Browse thousands of rental and sale properties across South Africa</p>
+    <div class="search-bar">
+      <input type="text" id="heroSearch" placeholder="Search by location or property name…" />
+      <div class="divider"></div>
+      <select id="heroListing">
+        <option value="">All Types</option>
+        <option value="rent">For Rent</option>
+        <option value="sale">For Sale</option>
+      </select>
+      <div class="divider"></div>
+      <select id="heroType">
+        <option value="">Property Type</option>
+        <option value="Apartment">Apartment</option>
+        <option value="House">House</option>
+        <option value="Studio">Studio</option>
+        <option value="Townhouse">Townhouse</option>
+        <option value="Commercial">Commercial</option>
+      </select>
+      <button onclick="heroSearch()">🔍 Search</button>
+    </div>
+    <div class="hero-tags">
+      <span onclick="quickSearch('Johannesburg')">📍 Johannesburg</span>
+      <span onclick="quickSearch('Cape Town')">📍 Cape Town</span>
+      <span onclick="quickSearch('Durban')">📍 Durban</span>
+      <span onclick="quickSearch('Pretoria')">📍 Pretoria</span>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stat"><div class="num" id="statListings">0</div><div class="lbl">Active Listings</div></div>
+    <div class="stat"><div class="num">500+</div><div class="lbl">Happy Tenants</div></div>
+    <div class="stat"><div class="num">50+</div><div class="lbl">Verified Agents</div></div>
+    <div class="stat"><div class="num">8</div><div class="lbl">Cities Covered</div></div>
+  </div>
+
+  <!-- FEATURED RENTALS -->
+  <div class="section">
+    <div class="section-header">
+      <h2>🏠 Featured Rentals</h2>
+      <a href="properties.html?listing=rent">View all rentals →</a>
+    </div>
+    <div class="cards-grid" id="featuredRentals"></div>
+  </div>
+
+  <!-- FEATURED SALES -->
+  <div class="section" style="padding-top:0">
+    <div class="section-header">
+      <h2>🏡 Properties For Sale</h2>
+      <a href="properties.html?listing=sale">View all sales →</a>
+    </div>
+    <div class="cards-grid" id="featuredSales"></div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how-it-works">
+    <div class="inner">
+      <h2>How It Works</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-icon">🔍</div>
+          <h3>Search Properties</h3>
+          <p>Browse our extensive listings filtered by location, price, and type.</p>
+        </div>
+        <div class="step">
+          <div class="step-icon">📋</div>
+          <h3>Apply Online</h3>
+          <p>Submit your rental application or purchase enquiry directly online.</p>
+        </div>
+        <div class="step">
+          <div class="step-icon">✅</div>
+          <h3>Get Approved</h3>
+          <p>Our agents review your application and respond within 24 hours.</p>
+        </div>
+        <div class="step">
+          <div class="step-icon">🔑</div>
+          <h3>Move In / Close Deal</h3>
+          <p>Sign your lease or sale agreement and get your keys!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">Prop<span>Rent</span></div>
+        <p>South Africa's trusted online platform for renting and buying property. Find your perfect home today.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Quick Links</h4>
+        <a href="properties.html?listing=rent">Rent a Property</a>
+        <a href="properties.html?listing=sale">Buy a Property</a>
+        <a href="dashboard.html">My Dashboard</a>
+      </div>
+      <div class="footer-col">
+        <h4>Property Types</h4>
+        <a href="properties.html?type=Apartment">Apartments</a>
+        <a href="properties.html?type=House">Houses</a>
+        <a href="properties.html?type=Studio">Studios</a>
+        <a href="properties.html?type=Commercial">Commercial</a>
+      </div>
+      <div class="footer-col">
+        <h4>Contact</h4>
+        <a href="#">📞 011 000 1234</a>
+        <a href="#">✉️ info@proprent.co.za</a>
+        <a href="#">📍 Sandton, Johannesburg</a>
+      </div>
+    </div>
+    <div class="footer-bottom">© 2025 PropRent. All rights reserved.</div>
+  </footer>
+
+  <script src="js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Stats counter
+      const total = DB.properties.filter(p => p.available).length;
+      animateCount('statListings', total);
+
+      // Featured rentals (first 3 available)
+      const rentals = DB.properties.filter(p => p.listing === 'rent' && p.available).slice(0, 3);
+      document.getElementById('featuredRentals').innerHTML = rentals.map(buildPropertyCard).join('');
+
+      // Featured sales (first 3 available)
+      const sales = DB.properties.filter(p => p.listing === 'sale' && p.available).slice(0, 3);
+      document.getElementById('featuredSales').innerHTML = sales.map(buildPropertyCard).join('');
+    });
+
+    function animateCount(id, target) {
+      const el = document.getElementById(id);
+      let count = 0;
+      const step = Math.ceil(target / 30);
+      const timer = setInterval(() => {
+        count = Math.min(count + step, target);
+        el.textContent = count + '+';
+        if (count >= target) clearInterval(timer);
+      }, 40);
+    }
+
+    function heroSearch() {
+      const q = document.getElementById('heroSearch').value;
+      const listing = document.getElementById('heroListing').value;
+      const type = document.getElementById('heroType').value;
+      const params = new URLSearchParams();
+      if (q) params.set('q', q);
+      if (listing) params.set('listing', listing);
+      if (type) params.set('type', type);
+      window.location.href = `properties.html?${params.toString()}`;
+    }
+
+    function quickSearch(city) {
+      window.location.href = `properties.html?q=${encodeURIComponent(city)}`;
+    }
+
+    document.getElementById('heroSearch').addEventListener('keydown', e => {
+      if (e.key === 'Enter') heroSearch();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard – PropRent</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+    .tabs { display:flex; gap:0.5rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+    .tab-btn { padding:0.5rem 1.2rem; border-radius:6px; border:1.5px solid var(--border); background:#fff; font-size:0.88rem; font-weight:600; cursor:pointer; color:var(--gray); transition:all 0.2s; }
+    .tab-btn.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+    .wishlist-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:1.2rem; }
+    .profile-form { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:1.5rem; max-width:600px; }
+    .add-property-form { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:1.5rem; max-width:700px; }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="index.html" class="logo">Prop<span>Rent</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="properties.html">Listings</a>
+      <span id="authLinks"></span>
+    </div>
+    <div class="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <div class="dashboard-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="user-info">
+        <div class="avatar" id="sidebarAvatar">?</div>
+        <div class="uname" id="sidebarName">Loading…</div>
+        <div class="urole" id="sidebarRole"></div>
+      </div>
+      <nav class="sidebar-nav" id="sidebarNav"></nav>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 id="pageHeading">Dashboard</h1>
+        <div id="pageActions"></div>
+      </div>
+
+      <!-- OVERVIEW TAB -->
+      <div class="tab-content active" id="tab-overview">
+        <div class="dash-stats" id="dashStats"></div>
+        <div class="table-card" id="recentActivity"></div>
+      </div>
+
+      <!-- MY APPLICATIONS TAB (tenant) -->
+      <div class="tab-content" id="tab-applications">
+        <div class="table-card">
+          <div class="table-header"><h3>My Applications</h3></div>
+          <div style="overflow-x:auto;"><table id="applicationsTable">
+            <thead><tr><th>Property</th><th>Type</th><th>Price</th><th>Applied</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody id="applicationsBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- WISHLIST TAB -->
+      <div class="tab-content" id="tab-wishlist">
+        <div class="wishlist-grid" id="wishlistGrid"></div>
+      </div>
+
+      <!-- ALL APPLICATIONS TAB (admin) -->
+      <div class="tab-content" id="tab-all-applications">
+        <div class="table-card">
+          <div class="table-header"><h3>All Applications</h3></div>
+          <div style="overflow-x:auto;"><table>
+            <thead><tr><th>Applicant</th><th>Property</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="allApplicationsBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- MANAGE PROPERTIES TAB (admin) -->
+      <div class="tab-content" id="tab-properties">
+        <div class="table-card">
+          <div class="table-header">
+            <h3>All Properties</h3>
+            <button class="btn btn-primary btn-sm" onclick="showTab('tab-add-property')">+ Add Property</button>
+          </div>
+          <div style="overflow-x:auto;"><table>
+            <thead><tr><th>Title</th><th>Location</th><th>Type</th><th>Price</th><th>Listing</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="propertiesBody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ADD PROPERTY TAB (admin) -->
+      <div class="tab-content" id="tab-add-property">
+        <div class="add-property-form">
+          <h3 style="margin-bottom:1.5rem;font-size:1.1rem;font-weight:700;">Add New Property</h3>
+          <form onsubmit="addProperty(event)">
+            <div class="form-row">
+              <div class="form-group"><label>Title</label><input type="text" id="pTitle" required /></div>
+              <div class="form-group"><label>Location</label><input type="text" id="pLocation" required /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Property Type</label>
+                <select id="pType">
+                  <option>Apartment</option><option>House</option><option>Studio</option><option>Townhouse</option><option>Commercial</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Listing Type</label>
+                <select id="pListing"><option value="rent">For Rent</option><option value="sale">For Sale</option></select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Price (ZAR)</label><input type="number" id="pPrice" required /></div>
+              <div class="form-group"><label>Size (m²)</label><input type="number" id="pSize" required /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Bedrooms</label><input type="number" id="pBeds" value="0" min="0" /></div>
+              <div class="form-group"><label>Bathrooms</label><input type="number" id="pBaths" value="1" min="1" /></div>
+            </div>
+            <div class="form-group"><label>Parking Spaces</label><input type="number" id="pParking" value="0" min="0" /></div>
+            <div class="form-group"><label>Description</label><textarea id="pDesc" required></textarea></div>
+            <div class="form-group"><label>Image URL</label><input type="url" id="pImage" placeholder="https://…" /></div>
+            <div class="form-group"><label>Amenities (comma separated)</label><input type="text" id="pAmenities" placeholder="WiFi, Pool, Security" /></div>
+            <div style="display:flex;gap:0.8rem;">
+              <button type="submit" class="btn btn-primary">Add Property</button>
+              <button type="button" class="btn" style="background:transparent;border:1.5px solid var(--border);color:var(--gray);" onclick="showTab('tab-properties')">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- PROFILE TAB -->
+      <div class="tab-content" id="tab-profile">
+        <div class="profile-form">
+          <h3 style="margin-bottom:1.5rem;font-size:1.1rem;font-weight:700;">My Profile</h3>
+          <form onsubmit="updateProfile(event)">
+            <div class="form-group"><label>Full Name</label><input type="text" id="profName" required /></div>
+            <div class="form-group"><label>Email</label><input type="email" id="profEmail" required /></div>
+            <div class="form-group"><label>Phone</label><input type="tel" id="profPhone" /></div>
+            <div class="form-group"><label>New Password (leave blank to keep current)</label><input type="password" id="profPassword" placeholder="••••••••" /></div>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </form>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!DB.currentUser) { window.location.href = 'login.html'; return; }
+      initDashboard();
+    });
+
+    function initDashboard() {
+      const user = DB.currentUser;
+      document.getElementById('sidebarAvatar').textContent = user.name.charAt(0).toUpperCase();
+      document.getElementById('sidebarName').textContent = user.name;
+      document.getElementById('sidebarRole').textContent = user.role === 'admin' ? '⚙️ Administrator' : '👤 Tenant';
+
+      const isAdmin = user.role === 'admin';
+      const navItems = isAdmin ? [
+        { tab: 'tab-overview', icon: '📊', label: 'Overview' },
+        { tab: 'tab-all-applications', icon: '📋', label: 'Applications' },
+        { tab: 'tab-properties', icon: '🏠', label: 'Properties' },
+        { tab: 'tab-add-property', icon: '➕', label: 'Add Property' },
+        { tab: 'tab-profile', icon: '👤', label: 'My Profile' },
+      ] : [
+        { tab: 'tab-overview', icon: '📊', label: 'Overview' },
+        { tab: 'tab-applications', icon: '📋', label: 'My Applications' },
+        { tab: 'tab-wishlist', icon: '❤️', label: 'Saved Properties' },
+        { tab: 'tab-profile', icon: '👤', label: 'My Profile' },
+      ];
+
+      document.getElementById('sidebarNav').innerHTML = navItems.map(n =>
+        `<a href="#" onclick="showTab('${n.tab}');return false;" id="nav-${n.tab}" class="${n.tab === 'tab-overview' ? 'active' : ''}">
+          <span class="icon">${n.icon}</span>${n.label}
+        </a>`
+      ).join('') + `<a href="#" onclick="logout()" style="margin-top:auto;"><span class="icon">🚪</span>Logout</a>`;
+
+      renderOverview();
+      if (isAdmin) { renderAllApplications(); renderPropertiesTable(); }
+      else { renderMyApplications(); renderWishlist(); }
+      prefillProfile();
+    }
+
+    function showTab(id) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+      document.getElementById(id)?.classList.add('active');
+      document.getElementById(`nav-${id}`)?.classList.add('active');
+      const titles = { 'tab-overview':'Dashboard Overview','tab-applications':'My Applications','tab-wishlist':'Saved Properties','tab-all-applications':'All Applications','tab-properties':'Manage Properties','tab-add-property':'Add New Property','tab-profile':'My Profile' };
+      document.getElementById('pageHeading').textContent = titles[id] || 'Dashboard';
+    }
+
+    function renderOverview() {
+      const user = DB.currentUser;
+      const isAdmin = user.role === 'admin';
+      const myApps = DB.applications.filter(a => a.tenantId === user.id);
+      const wishCount = DB.wishlist.length;
+
+      if (isAdmin) {
+        document.getElementById('dashStats').innerHTML = `
+          <div class="dash-stat-card"><div class="icon icon-blue">🏠</div><div class="info"><div class="val">${DB.properties.length}</div><div class="lbl">Total Properties</div></div></div>
+          <div class="dash-stat-card"><div class="icon icon-green">✅</div><div class="info"><div class="val">${DB.properties.filter(p=>p.available).length}</div><div class="lbl">Available</div></div></div>
+          <div class="dash-stat-card"><div class="icon icon-orange">📋</div><div class="info"><div class="val">${DB.applications.length}</div><div class="lbl">Applications</div></div></div>
+          <div class="dash-stat-card"><div class="icon icon-red">⏳</div><div class="info"><div class="val">${DB.applications.filter(a=>a.status==='pending').length}</div><div class="lbl">Pending Review</div></div></div>`;
+      } else {
+        document.getElementById('dashStats').innerHTML = `
+          <div class="dash-stat-card"><div class="icon icon-blue">📋</div><div class="info"><div class="val">${myApps.length}</div><div class="lbl">Applications</div></div></div>
+          <div class="dash-stat-card"><div class="icon icon-green">✅</div><div class="info"><div class="val">${myApps.filter(a=>a.status==='approved').length}</div><div class="lbl">Approved</div></div></div>
+          <div class="dash-stat-card"><div class="icon icon-orange">⏳</div><div class="info"><div class="val">${myApps.filter(a=>a.status==='pending').length}</div><div class="lbl">Pending</div></div></div>
+          <div class="dash-stat-card"><div class="icon icon-red">❤️</div><div class="info"><div class="val">${wishCount}</div><div class="lbl">Saved Properties</div></div></div>`;
+      }
+
+      document.getElementById('recentActivity').innerHTML = `
+        <div class="table-header"><h3>Recent Activity</h3></div>
+        <table><thead><tr><th>Activity</th><th>Date</th><th>Status</th></tr></thead>
+        <tbody>${(isAdmin ? DB.applications : myApps).slice(-5).reverse().map(a => {
+          const prop = DB.properties.find(p => p.id === a.propertyId);
+          return `<tr>
+            <td>${isAdmin ? `<strong>${a.tenantName}</strong> applied for ` : 'Applied for '}<a href="property-detail.html?id=${a.propertyId}" style="color:var(--primary)">${prop?.title || 'Unknown'}</a></td>
+            <td>${a.date}</td>
+            <td><span class="status-badge status-${a.status}">${a.status}</span></td>
+          </tr>`;
+        }).join('')}</tbody></table>`;
+    }
+
+    function renderMyApplications() {
+      const apps = DB.applications.filter(a => a.tenantId === DB.currentUser.id);
+      document.getElementById('applicationsBody').innerHTML = apps.length ? apps.map(a => {
+        const prop = DB.properties.find(p => p.id === a.propertyId);
+        return `<tr>
+          <td><a href="property-detail.html?id=${a.propertyId}" style="color:var(--primary);font-weight:600;">${prop?.title || 'Unknown'}</a></td>
+          <td>${prop?.type || '-'}</td>
+          <td>${prop ? formatPrice(prop.price, prop.listing).replace(/<[^>]+>/g,'') : '-'}</td>
+          <td>${a.date}</td>
+          <td><span class="status-badge status-${a.status}">${a.status}</span></td>
+          <td><a href="property-detail.html?id=${a.propertyId}" class="btn btn-sm btn-outline">View</a></td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:2rem;">No applications yet. <a href="properties.html" style="color:var(--primary)">Browse properties</a></td></tr>';
+    }
+
+    function renderWishlist() {
+      const saved = DB.properties.filter(p => DB.wishlist.includes(p.id));
+      document.getElementById('wishlistGrid').innerHTML = saved.length
+        ? saved.map(buildPropertyCard).join('')
+        : '<div style="text-align:center;padding:3rem;color:var(--gray);grid-column:1/-1"><div style="font-size:2.5rem">❤️</div><p>No saved properties yet.</p><a href="properties.html" class="btn btn-primary" style="margin-top:1rem;display:inline-block">Browse Properties</a></div>';
+    }
+
+    function renderAllApplications() {
+      document.getElementById('allApplicationsBody').innerHTML = DB.applications.map(a => {
+        const prop = DB.properties.find(p => p.id === a.propertyId);
+        return `<tr>
+          <td><strong>${a.tenantName}</strong><br/><span style="font-size:0.8rem;color:var(--gray)">${a.tenantEmail}</span></td>
+          <td><a href="property-detail.html?id=${a.propertyId}" style="color:var(--primary)">${prop?.title || 'Unknown'}</a></td>
+          <td>${a.date}</td>
+          <td><span class="status-badge status-${a.status}">${a.status}</span></td>
+          <td style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+            ${a.status === 'pending' ? `
+              <button class="btn btn-sm btn-success" onclick="updateAppStatus(${a.id},'approved')">Approve</button>
+              <button class="btn btn-sm btn-danger" onclick="updateAppStatus(${a.id},'rejected')">Reject</button>` : ''}
+            <button class="btn btn-sm btn-outline" onclick="viewMessage(${a.id})">Message</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderPropertiesTable() {
+      document.getElementById('propertiesBody').innerHTML = DB.properties.map(p => `
+        <tr>
+          <td><strong>${p.title}</strong></td>
+          <td>${p.location}</td>
+          <td>${p.type}</td>
+          <td>${formatPrice(p.price, p.listing).replace(/<[^>]+>/g,'')}</td>
+          <td><span class="badge badge-${p.listing}" style="position:static">${p.listing === 'rent' ? 'Rent' : 'Sale'}</span></td>
+          <td><span class="status-badge ${p.available ? 'status-available' : 'status-rented'}">${p.available ? 'Available' : 'Taken'}</span></td>
+          <td style="display:flex;gap:0.4rem;">
+            <button class="btn btn-sm btn-outline" onclick="toggleAvailability(${p.id})">${p.available ? 'Mark Taken' : 'Mark Available'}</button>
+            <a href="property-detail.html?id=${p.id}" class="btn btn-sm" style="background:var(--light);border:1.5px solid var(--border);">View</a>
+          </td>
+        </tr>`).join('');
+    }
+
+    function updateAppStatus(appId, status) {
+      const app = DB.applications.find(a => a.id === appId);
+      if (app) { app.status = status; saveDB(); renderAllApplications(); renderOverview(); showToast(`Application ${status}`, status === 'approved' ? 'success' : 'error'); }
+    }
+
+    function viewMessage(appId) {
+      const app = DB.applications.find(a => a.id === appId);
+      if (app) alert(`Message from ${app.tenantName}:\n\n"${app.message}"\n\nPhone: ${app.tenantPhone}`);
+    }
+
+    function toggleAvailability(propId) {
+      const prop = DB.properties.find(p => p.id === propId);
+      if (prop) { prop.available = !prop.available; saveDB(); renderPropertiesTable(); showToast(`Property marked as ${prop.available ? 'available' : 'taken'}`, 'info'); }
+    }
+
+    function addProperty(e) {
+      e.preventDefault();
+      const amenities = document.getElementById('pAmenities').value.split(',').map(a => a.trim()).filter(Boolean);
+      const prop = {
+        id: DB.nextId.property++,
+        title: document.getElementById('pTitle').value,
+        location: document.getElementById('pLocation').value,
+        type: document.getElementById('pType').value,
+        listing: document.getElementById('pListing').value,
+        price: Number(document.getElementById('pPrice').value),
+        size: Number(document.getElementById('pSize').value),
+        bedrooms: Number(document.getElementById('pBeds').value),
+        bathrooms: Number(document.getElementById('pBaths').value),
+        parking: Number(document.getElementById('pParking').value),
+        description: document.getElementById('pDesc').value,
+        image: document.getElementById('pImage').value || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600&q=80',
+        amenities,
+        featured: false,
+        available: true,
+        agent: { name: DB.currentUser.name, role: 'Agent', avatar: 'https://i.pravatar.cc/48?img=1' }
+      };
+      DB.properties.push(prop);
+      saveDB();
+      showToast('Property added successfully!', 'success');
+      e.target.reset();
+      showTab('tab-properties');
+      renderPropertiesTable();
+      renderOverview();
+    }
+
+    function prefillProfile() {
+      const u = DB.currentUser;
+      document.getElementById('profName').value = u.name;
+      document.getElementById('profEmail').value = u.email;
+      document.getElementById('profPhone').value = u.phone || '';
+    }
+
+    function updateProfile(e) {
+      e.preventDefault();
+      const user = DB.users.find(u => u.id === DB.currentUser.id);
+      user.name = document.getElementById('profName').value;
+      user.email = document.getElementById('profEmail').value;
+      user.phone = document.getElementById('profPhone').value;
+      const newPass = document.getElementById('profPassword').value;
+      if (newPass) user.password = newPass;
+      DB.currentUser = user;
+      saveDB();
+      document.getElementById('sidebarName').textContent = user.name;
+      document.getElementById('sidebarAvatar').textContent = user.name.charAt(0).toUpperCase();
+      showToast('Profile updated successfully!', 'success');
+    }
+  </script>
+</body>
+</html>

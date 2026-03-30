@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browse Properties – PropRent</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .properties-hero { background: var(--dark); color:#fff; padding: 2.5rem 2rem; text-align:center; }
+    .properties-hero h1 { font-size:1.8rem; font-weight:800; }
+    .properties-hero p { color:#8fa3b8; margin-top:0.4rem; }
+    .properties-layout { display:grid; grid-template-columns:260px 1fr; gap:1.5rem; max-width:1200px; margin:2rem auto; padding:0 2rem; }
+    .sidebar-filters { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:1.4rem; height:fit-content; position:sticky; top:80px; }
+    .sidebar-filters h3 { font-size:1rem; font-weight:700; margin-bottom:1.2rem; }
+    .filter-section { margin-bottom:1.2rem; border-bottom:1px solid var(--border); padding-bottom:1.2rem; }
+    .filter-section:last-child { border-bottom:none; margin-bottom:0; }
+    .filter-section h4 { font-size:0.82rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--gray); margin-bottom:0.7rem; }
+    .filter-section label { display:flex; align-items:center; gap:0.5rem; font-size:0.88rem; margin-bottom:0.4rem; cursor:pointer; }
+    .price-range { display:flex; gap:0.5rem; align-items:center; }
+    .price-range input { flex:1; border:1.5px solid var(--border); border-radius:6px; padding:0.4rem 0.6rem; font-size:0.85rem; outline:none; }
+    .price-range input:focus { border-color:var(--primary); }
+    .no-results { text-align:center; padding:4rem 2rem; color:var(--gray); }
+    .no-results .icon { font-size:3rem; margin-bottom:1rem; }
+    .sort-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; }
+    .sort-bar select { border:1.5px solid var(--border); border-radius:6px; padding:0.4rem 0.7rem; font-size:0.88rem; outline:none; }
+    @media(max-width:800px){ .properties-layout{grid-template-columns:1fr;} .sidebar-filters{position:static;} }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="index.html" class="logo">Prop<span>Rent</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="properties.html?listing=rent">Rent</a>
+      <a href="properties.html?listing=sale">Buy</a>
+      <a href="properties.html" class="active">All Listings</a>
+      <span id="authLinks"></span>
+    </div>
+    <div class="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <!-- PAGE HERO -->
+  <div class="properties-hero">
+    <h1 id="pageTitle">All Properties</h1>
+    <p id="pageSubtitle">Browse available rentals and properties for sale</p>
+  </div>
+
+  <div class="properties-layout">
+
+    <!-- SIDEBAR FILTERS -->
+    <aside class="sidebar-filters">
+      <h3>🔧 Filters</h3>
+
+      <div class="filter-section">
+        <h4>Search</h4>
+        <input type="text" id="searchInput" placeholder="Location or name…" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:0.45rem 0.7rem;font-size:0.88rem;outline:none;" />
+      </div>
+
+      <div class="filter-section">
+        <h4>Listing Type</h4>
+        <label><input type="radio" name="listing" value=""> All</label>
+        <label><input type="radio" name="listing" value="rent"> For Rent</label>
+        <label><input type="radio" name="listing" value="sale"> For Sale</label>
+      </div>
+
+      <div class="filter-section">
+        <h4>Property Type</h4>
+        <label><input type="checkbox" value="Apartment"> Apartment</label>
+        <label><input type="checkbox" value="House"> House</label>
+        <label><input type="checkbox" value="Studio"> Studio</label>
+        <label><input type="checkbox" value="Townhouse"> Townhouse</label>
+        <label><input type="checkbox" value="Commercial"> Commercial</label>
+      </div>
+
+      <div class="filter-section">
+        <h4>Price Range (ZAR)</h4>
+        <div class="price-range">
+          <input type="number" id="minPrice" placeholder="Min" />
+          <span>–</span>
+          <input type="number" id="maxPrice" placeholder="Max" />
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <h4>Bedrooms (min)</h4>
+        <label><input type="radio" name="beds" value=""> Any</label>
+        <label><input type="radio" name="beds" value="1"> 1+</label>
+        <label><input type="radio" name="beds" value="2"> 2+</label>
+        <label><input type="radio" name="beds" value="3"> 3+</label>
+        <label><input type="radio" name="beds" value="4"> 4+</label>
+      </div>
+
+      <div class="filter-section">
+        <h4>Availability</h4>
+        <label><input type="checkbox" id="availableOnly" checked> Available only</label>
+      </div>
+
+      <button class="btn btn-primary btn-block" onclick="applyFilters()">Apply Filters</button>
+      <button class="btn btn-block" style="margin-top:0.5rem;background:transparent;border:1.5px solid var(--border);color:var(--gray);" onclick="resetFilters()">Reset</button>
+    </aside>
+
+    <!-- RESULTS -->
+    <div>
+      <div class="sort-bar">
+        <span id="resultsCount" style="font-size:0.9rem;color:var(--gray);"></span>
+        <select id="sortSelect" onchange="applyFilters()">
+          <option value="default">Sort: Default</option>
+          <option value="price-asc">Price: Low to High</option>
+          <option value="price-desc">Price: High to Low</option>
+          <option value="newest">Newest First</option>
+        </select>
+      </div>
+      <div class="cards-grid" id="propertiesGrid"></div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="logo">Prop<span>Rent</span></div>
+        <p>South Africa's trusted online platform for renting and buying property.</p>
+      </div>
+      <div class="footer-col"><h4>Quick Links</h4><a href="properties.html?listing=rent">Rent</a><a href="properties.html?listing=sale">Buy</a><a href="dashboard.html">Dashboard</a></div>
+      <div class="footer-col"><h4>Contact</h4><a href="#">📞 011 000 1234</a><a href="#">✉️ info@proprent.co.za</a></div>
+    </div>
+    <div class="footer-bottom">© 2025 PropRent. All rights reserved.</div>
+  </footer>
+
+  <script src="js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+      const listing = params.get('listing') || '';
+      const type = params.get('type') || '';
+      const q = params.get('q') || '';
+
+      // Pre-fill filters from URL
+      if (listing) {
+        document.querySelector(`input[name="listing"][value="${listing}"]`)?.setAttribute('checked', true);
+        document.querySelector(`input[name="listing"][value="${listing}"]`).checked = true;
+      } else {
+        document.querySelector('input[name="listing"][value=""]').checked = true;
+      }
+      if (type) {
+        const cb = document.querySelector(`input[type="checkbox"][value="${type}"]`);
+        if (cb) cb.checked = true;
+      }
+      if (q) document.getElementById('searchInput').value = q;
+
+      // Update page title
+      if (listing === 'rent') { document.getElementById('pageTitle').textContent = 'Properties For Rent'; document.getElementById('pageSubtitle').textContent = 'Find your next rental home'; }
+      else if (listing === 'sale') { document.getElementById('pageTitle').textContent = 'Properties For Sale'; document.getElementById('pageSubtitle').textContent = 'Find your dream home to buy'; }
+
+      applyFilters();
+
+      // Live search
+      document.getElementById('searchInput').addEventListener('input', applyFilters);
+    });
+
+    function applyFilters() {
+      const q = document.getElementById('searchInput').value;
+      const listing = document.querySelector('input[name="listing"]:checked')?.value || '';
+      const types = [...document.querySelectorAll('input[type="checkbox"][value]')].filter(c => c.checked && c.value !== 'on').map(c => c.value);
+      const minPrice = document.getElementById('minPrice').value;
+      const maxPrice = document.getElementById('maxPrice').value;
+      const bedrooms = document.querySelector('input[name="beds"]:checked')?.value || '';
+      const availableOnly = document.getElementById('availableOnly').checked;
+      const sort = document.getElementById('sortSelect').value;
+
+      let results = [...DB.properties];
+      if (q) results = results.filter(p => p.title.toLowerCase().includes(q.toLowerCase()) || p.location.toLowerCase().includes(q.toLowerCase()));
+      if (listing) results = results.filter(p => p.listing === listing);
+      if (types.length) results = results.filter(p => types.includes(p.type));
+      if (minPrice) results = results.filter(p => p.price >= Number(minPrice));
+      if (maxPrice) results = results.filter(p => p.price <= Number(maxPrice));
+      if (bedrooms) results = results.filter(p => p.bedrooms >= Number(bedrooms));
+      if (availableOnly) results = results.filter(p => p.available);
+
+      if (sort === 'price-asc') results.sort((a, b) => a.price - b.price);
+      else if (sort === 'price-desc') results.sort((a, b) => b.price - a.price);
+
+      const grid = document.getElementById('propertiesGrid');
+      document.getElementById('resultsCount').textContent = `${results.length} propert${results.length !== 1 ? 'ies' : 'y'} found`;
+
+      if (results.length === 0) {
+        grid.innerHTML = `<div class="no-results" style="grid-column:1/-1"><div class="icon">🏚️</div><h3>No properties found</h3><p>Try adjusting your filters</p></div>`;
+      } else {
+        grid.innerHTML = results.map(buildPropertyCard).join('');
+      }
+    }
+
+    function resetFilters() {
+      document.getElementById('searchInput').value = '';
+      document.querySelector('input[name="listing"][value=""]').checked = true;
+      document.querySelectorAll('input[type="checkbox"]').forEach(c => { if (c.id !== 'availableOnly') c.checked = false; });
+      document.getElementById('availableOnly').checked = true;
+      document.querySelector('input[name="beds"][value=""]').checked = true;
+      document.getElementById('minPrice').value = '';
+      document.getElementById('maxPrice').value = '';
+      document.getElementById('sortSelect').value = 'default';
+      applyFilters();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Property Detail – PropRent</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .breadcrumb { background:#fff; padding:0.8rem 2rem; font-size:0.85rem; color:var(--gray); border-bottom:1px solid var(--border); }
+    .breadcrumb a { color:var(--primary); }
+    .map-placeholder { background:#e8f0fe; border-radius:var(--radius); height:200px; display:flex; align-items:center; justify-content:center; color:var(--primary); font-size:0.9rem; margin-top:1.5rem; border:2px dashed var(--primary); }
+    .agent-card { background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:1.2rem; margin-top:1rem; }
+    .agent-card h4 { font-size:0.85rem; font-weight:700; color:var(--gray); text-transform:uppercase; margin-bottom:0.8rem; }
+    .similar-section { max-width:1200px; margin:0 auto; padding:2rem; }
+    .similar-section h2 { font-size:1.3rem; font-weight:700; margin-bottom:1.2rem; }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a href="index.html" class="logo">Prop<span>Rent</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html">Home</a>
+      <a href="properties.html?listing=rent">Rent</a>
+      <a href="properties.html?listing=sale">Buy</a>
+      <a href="properties.html">All Listings</a>
+      <span id="authLinks"></span>
+    </div>
+    <div class="hamburger"><span></span><span></span><span></span></div>
+  </nav>
+
+  <!-- BREADCRUMB -->
+  <div class="breadcrumb">
+    <a href="index.html">Home</a> › <a href="properties.html">Properties</a> › <span id="breadcrumbTitle">Loading…</span>
+  </div>
+
+  <!-- DETAIL LAYOUT -->
+  <div class="detail-layout" id="detailLayout">
+    <div style="text-align:center;padding:4rem;color:var(--gray);">Loading property…</div>
+  </div>
+
+  <!-- SIMILAR PROPERTIES -->
+  <div class="similar-section">
+    <h2>Similar Properties</h2>
+    <div class="cards-grid" id="similarGrid"></div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-grid">
+      <div class="footer-brand"><div class="logo">Prop<span>Rent</span></div><p>South Africa's trusted property platform.</p></div>
+      <div class="footer-col"><h4>Quick Links</h4><a href="properties.html?listing=rent">Rent</a><a href="properties.html?listing=sale">Buy</a></div>
+      <div class="footer-col"><h4>Contact</h4><a href="#">📞 011 000 1234</a><a href="#">✉️ info@proprent.co.za</a></div>
+    </div>
+    <div class="footer-bottom">© 2025 PropRent. All rights reserved.</div>
+  </footer>
+
+  <!-- ENQUIRY MODAL -->
+  <div class="modal-overlay" id="enquiryModal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('enquiryModal')">✕</button>
+      <h2>📋 Apply / Enquire</h2>
+      <form id="enquiryForm" onsubmit="submitEnquiry(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="appName" required />
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="appEmail" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="tel" id="appPhone" required />
+        </div>
+        <div class="form-group">
+          <label>Move-in / Viewing Date</label>
+          <input type="date" id="appDate" />
+        </div>
+        <div class="form-group">
+          <label>Message</label>
+          <textarea id="appMessage" placeholder="Tell the agent about yourself and why you're interested…" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Submit Application</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    let currentProperty = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const id = Number(new URLSearchParams(window.location.search).get('id'));
+      currentProperty = DB.properties.find(p => p.id === id);
+
+      if (!currentProperty) {
+        document.getElementById('detailLayout').innerHTML = '<div style="text-align:center;padding:4rem;color:var(--gray);grid-column:1/-1"><h2>Property not found</h2><a href="properties.html" class="btn btn-primary" style="margin-top:1rem;display:inline-block">Browse Properties</a></div>';
+        return;
+      }
+
+      document.title = `${currentProperty.title} – PropRent`;
+      document.getElementById('breadcrumbTitle').textContent = currentProperty.title;
+
+      renderDetail(currentProperty);
+      renderSimilar(currentProperty);
+
+      // Pre-fill form if logged in
+      if (DB.currentUser) {
+        document.getElementById('appName').value = DB.currentUser.name;
+        document.getElementById('appEmail').value = DB.currentUser.email;
+        document.getElementById('appPhone').value = DB.currentUser.phone || '';
+      }
+    });
+
+    function renderDetail(p) {
+      const inWishlist = DB.wishlist.includes(p.id);
+      document.getElementById('detailLayout').innerHTML = `
+        <div>
+          <div class="detail-gallery">
+            <img class="main-img" id="mainImg" src="${p.image}" alt="${p.title}" />
+            <div class="thumb-row">
+              <img src="${p.image}" class="active" onclick="setMainImg(this, '${p.image}')" alt="View 1"/>
+              <img src="https://images.unsplash.com/photo-1484154218962-a197022b5858?w=200&q=60" onclick="setMainImg(this, 'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&q=80')" alt="View 2"/>
+              <img src="https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=200&q=60" onclick="setMainImg(this, 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&q=80')" alt="View 3"/>
+              <img src="https://images.unsplash.com/photo-1507089947368-19c1da9775ae?w=200&q=60" onclick="setMainImg(this, 'https://images.unsplash.com/photo-1507089947368-19c1da9775ae?w=600&q=80')" alt="View 4"/>
+            </div>
+          </div>
+
+          <div class="detail-info">
+            <div style="display:flex;gap:0.6rem;margin-bottom:0.8rem;flex-wrap:wrap;">
+              <span class="badge badge-${p.listing}" style="position:static">${p.listing === 'rent' ? 'For Rent' : 'For Sale'}</span>
+              ${p.featured ? '<span class="badge badge-featured" style="position:static">Featured</span>' : ''}
+              <span class="status-badge ${p.available ? 'status-available' : 'status-rented'}" style="position:static">${p.available ? 'Available' : 'Not Available'}</span>
+            </div>
+            <h1 class="detail-info" style="font-size:1.7rem;font-weight:800;margin-bottom:0.4rem;">${p.title}</h1>
+            <div class="detail-price">${formatPrice(p.price, p.listing)}</div>
+            <div class="detail-location">📍 ${p.location}</div>
+
+            <div class="detail-features">
+              ${p.bedrooms > 0 ? `<div class="feat">🛏 <strong>${p.bedrooms}</strong> Bedroom${p.bedrooms > 1 ? 's' : ''}</div>` : ''}
+              <div class="feat">🚿 <strong>${p.bathrooms}</strong> Bathroom${p.bathrooms > 1 ? 's' : ''}</div>
+              <div class="feat">🚗 <strong>${p.parking}</strong> Parking</div>
+              <div class="feat">📐 <strong>${p.size}m²</strong> Size</div>
+              <div class="feat">🏠 <strong>${p.type}</strong></div>
+            </div>
+
+            <p class="detail-desc">${p.description}</p>
+
+            <h3 style="font-size:1rem;font-weight:700;margin-bottom:0.8rem;">Amenities & Features</h3>
+            <div class="amenities">
+              ${p.amenities.map(a => `<span class="amenity-tag">✓ ${a}</span>`).join('')}
+            </div>
+
+            <div style="display:flex;gap:0.8rem;flex-wrap:wrap;margin-top:1.5rem;">
+              <button class="btn btn-primary" onclick="openEnquiry()" ${!p.available ? 'disabled style="opacity:0.5"' : ''}>
+                📋 ${p.listing === 'rent' ? 'Apply to Rent' : 'Enquire to Buy'}
+              </button>
+              <button class="btn btn-outline" onclick="toggleWishlistDetail(${p.id})" id="wishlistBtn">
+                ${inWishlist ? '❤️ Saved' : '🤍 Save Property'}
+              </button>
+              <a href="tel:+27110001234" class="btn" style="background:var(--success);color:#fff;">📞 Call Agent</a>
+            </div>
+
+            <div class="map-placeholder">
+              🗺️ Map view – ${p.location}
+            </div>
+          </div>
+        </div>
+
+        <!-- ENQUIRY SIDEBAR -->
+        <div>
+          <div class="enquiry-card">
+            <h3>Contact Agent</h3>
+            <div class="agent">
+              <img class="agent-avatar" src="${p.agent.avatar}" alt="${p.agent.name}" />
+              <div class="agent-info">
+                <div class="name">${p.agent.name}</div>
+                <div class="role">${p.agent.role}</div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" onclick="openEnquiry()" ${!p.available ? 'disabled style="opacity:0.5"' : ''}>
+              📋 ${p.listing === 'rent' ? 'Apply to Rent' : 'Enquire to Buy'}
+            </button>
+            <button class="btn btn-block btn-outline" style="margin-top:0.6rem;" onclick="window.location.href='tel:+27110001234'">📞 Call Agent</button>
+            <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);font-size:0.82rem;color:var(--gray);">
+              <div>🏷️ Ref: PROP-00${p.id}</div>
+              <div style="margin-top:0.3rem;">📅 Listed: Jan 2025</div>
+            </div>
+          </div>
+
+          <div class="agent-card">
+            <h4>Property Summary</h4>
+            <table style="width:100%;font-size:0.88rem;">
+              <tr><td style="color:var(--gray);padding:0.3rem 0;">Type</td><td style="font-weight:600;">${p.type}</td></tr>
+              <tr><td style="color:var(--gray);padding:0.3rem 0;">Listing</td><td style="font-weight:600;">${p.listing === 'rent' ? 'For Rent' : 'For Sale'}</td></tr>
+              <tr><td style="color:var(--gray);padding:0.3rem 0;">Size</td><td style="font-weight:600;">${p.size}m²</td></tr>
+              ${p.bedrooms > 0 ? `<tr><td style="color:var(--gray);padding:0.3rem 0;">Bedrooms</td><td style="font-weight:600;">${p.bedrooms}</td></tr>` : ''}
+              <tr><td style="color:var(--gray);padding:0.3rem 0;">Bathrooms</td><td style="font-weight:600;">${p.bathrooms}</td></tr>
+              <tr><td style="color:var(--gray);padding:0.3rem 0;">Parking</td><td style="font-weight:600;">${p.parking}</td></tr>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    function renderSimilar(p) {
+      const similar = DB.properties.filter(x => x.id !== p.id && (x.type === p.type || x.listing === p.listing) && x.available).slice(0, 3);
+      document.getElementById('similarGrid').innerHTML = similar.map(buildPropertyCard).join('');
+    }
+
+    function setMainImg(thumb, src) {
+      document.getElementById('mainImg').src = src;
+      document.querySelectorAll('.thumb-row img').forEach(t => t.classList.remove('active'));
+      thumb.classList.add('active');
+    }
+
+    function openEnquiry() {
+      if (!DB.currentUser) {
+        showToast('Please log in to apply', 'info');
+        setTimeout(() => window.location.href = `login.html?redirect=property-detail.html?id=${currentProperty.id}`, 800);
+        return;
+      }
+      openModal('enquiryModal');
+    }
+
+    function toggleWishlistDetail(id) {
+      const idx = DB.wishlist.indexOf(id);
+      if (idx === -1) { DB.wishlist.push(id); showToast('Saved to wishlist', 'success'); }
+      else { DB.wishlist.splice(idx, 1); showToast('Removed from wishlist', 'info'); }
+      saveDB();
+      const btn = document.getElementById('wishlistBtn');
+      btn.textContent = DB.wishlist.includes(id) ? '❤️ Saved' : '🤍 Save Property';
+    }
+
+    function submitEnquiry(e) {
+      e.preventDefault();
+      const message = document.getElementById('appMessage').value;
+      const success = submitApplication(currentProperty.id, { message });
+      if (success) {
+        closeModal('enquiryModal');
+        showToast('Application submitted successfully!', 'success');
+        document.getElementById('enquiryForm').reset();
+      }
+    }
+  </script>
+</body>
+</html>
