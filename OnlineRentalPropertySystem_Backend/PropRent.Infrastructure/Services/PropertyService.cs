@@ -24,8 +24,10 @@ public class PropertyService : IPropertyService
             .Include(p => p.Images)
             .Include(p => p.Amenities)
             .Include(p => p.Agent)
-            .Where(p => p.ListingStatus == "approved" && p.IsAvailable)
+            .Where(p => p.ListingStatus == "approved")
             .AsQueryable();
+
+        if (f.AvailableOnly == true) query = query.Where(p => p.IsAvailable);
 
         if (!string.IsNullOrWhiteSpace(f.Query))
             query = query.Where(p => p.Title.Contains(f.Query) || p.Location.Contains(f.Query));
@@ -40,12 +42,7 @@ public class PropertyService : IPropertyService
         if (f.MinBedrooms.HasValue)
             query = query.Where(p => p.Bedrooms >= f.MinBedrooms.Value);
 
-        query = f.SortBy switch
-        {
-            "price-asc"  => query.OrderBy(p => p.Price),
-            "price-desc" => query.OrderByDescending(p => p.Price),
-            _            => query.OrderByDescending(p => p.IsFeatured).ThenByDescending(p => p.CreatedAt)
-        };
+        query = query.OrderByDescending(p => p.CreatedAt);
 
         var total = await query.CountAsync();
         var items = await query.Skip((f.Page - 1) * f.PageSize).Take(f.PageSize).ToListAsync();
@@ -86,7 +83,9 @@ public class PropertyService : IPropertyService
         if (agentUserId.HasValue && agentId == null)
         {
             var agent = await _db.Agents.FirstOrDefaultAsync(a => a.UserId == agentUserId.Value);
-            agentId = agent?.Id;
+            if (agent == null || !agent.IsActive)
+                throw new UnauthorizedAccessException("Your agent account is not yet approved by admin.");
+            agentId = agent.Id;
         }
 
         var property = new Property
@@ -125,7 +124,9 @@ public class PropertyService : IPropertyService
         if (agentUserId.HasValue)
         {
             var agent = await _db.Agents.FirstOrDefaultAsync(a => a.UserId == agentUserId.Value);
-            if (agent == null || p.AgentId != agent.Id)
+            if (agent == null || !agent.IsActive)
+                throw new UnauthorizedAccessException("Your agent account is not yet approved by admin.");
+            if (p.AgentId != agent.Id)
                 throw new UnauthorizedAccessException("You can only edit your own properties.");
         }
 
@@ -155,7 +156,9 @@ public class PropertyService : IPropertyService
         if (agentUserId.HasValue)
         {
             var agent = await _db.Agents.FirstOrDefaultAsync(a => a.UserId == agentUserId.Value);
-            if (agent == null || p.AgentId != agent.Id)
+            if (agent == null || !agent.IsActive)
+                throw new UnauthorizedAccessException("Your agent account is not yet approved by admin.");
+            if (p.AgentId != agent.Id)
                 throw new UnauthorizedAccessException("You can only delete your own properties.");
         }
 
@@ -172,7 +175,9 @@ public class PropertyService : IPropertyService
         if (agentUserId.HasValue)
         {
             var agent = await _db.Agents.FirstOrDefaultAsync(a => a.UserId == agentUserId.Value);
-            if (agent == null || p.AgentId != agent.Id)
+            if (agent == null || !agent.IsActive)
+                throw new UnauthorizedAccessException("Your agent account is not yet approved by admin.");
+            if (p.AgentId != agent.Id)
                 throw new UnauthorizedAccessException("You can only update your own properties.");
         }
 
@@ -241,6 +246,7 @@ public class PropertyService : IPropertyService
             .Include(p => p.Images).Include(p => p.Amenities).Include(p => p.Agent)
             .Where(p => p.Id != propertyId && p.IsAvailable && p.ListingStatus == "approved" &&
                         (p.PropertyType == source.PropertyType || p.ListingType == source.ListingType))
+            .OrderByDescending(p => p.CreatedAt)
             .Take(count).ToListAsync();
 
         return similar.Select(MapToDto).ToList();

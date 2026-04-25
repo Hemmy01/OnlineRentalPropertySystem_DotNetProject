@@ -3,6 +3,13 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { applicationApi, propertyApi, wishlistApi, userApi, agentApi } from '../../api/services'
 import { LocationPicker } from '../../components/common/LocationMap'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
+} from 'recharts'
+import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 function Sidebar({ user, activeTab, onTabChange, onLogout }) {
@@ -26,6 +33,7 @@ function Sidebar({ user, activeTab, onTabChange, onLogout }) {
     { id: 'properties',       label: 'Properties' },
     { id: 'agents',           label: 'Agents' },
     { id: 'users',            label: 'Users' },
+    { id: 'reports',          label: 'Reports' },
     { id: 'profile',          label: 'My Profile' },
   ]
 
@@ -184,11 +192,11 @@ function AllApplicationsTab({ applications, onUpdateStatus }) {
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Applicant</th><th>Property</th><th>Date</th><th>Status</th></tr>
+            <tr><th>Applicant</th><th>Property</th><th>Message</th><th>Viewing Date</th><th>Date</th><th>Status</th></tr>
           </thead>
           <tbody>
             {applications.length === 0 ? (
-              <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--gray)', padding: '2rem' }}>No applications yet</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--gray)', padding: '2rem' }}>No applications yet</td></tr>
             ) : applications.map(a => (
               <tr key={a.id}>
                 <td>
@@ -196,6 +204,8 @@ function AllApplicationsTab({ applications, onUpdateStatus }) {
                   <small style={{ color: 'var(--gray)' }}>{a.tenantEmail}</small>
                 </td>
                 <td>{a.propertyTitle}</td>
+                <td style={{ maxWidth: 200, whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>{a.message || '—'}</td>
+                <td>{a.viewingDate ? new Date(a.viewingDate).toLocaleDateString() : '—'}</td>
                 <td>{new Date(a.createdAt).toLocaleDateString()}</td>
                 <td>
                   {a.status === 'pending' ? (
@@ -249,11 +259,28 @@ const EMPTY_FORM = {
 
 function PropertyForm({ initial, onSubmit, onCancel, loading, submitLabel }) {
   const [form, setForm] = useState(initial)
+  const [uploading, setUploading] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState(initial.imageUrl || '')
   const handleChange = e => {
     const { name, value, type, checked } = e.target
     setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }))
   }
   const isEdit = !!initial.id
+
+  const handleImagePick = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await propertyApi.uploadImage(file).then(r => r.data.url)
+      setForm(prev => ({ ...prev, imageUrl: url }))
+      setPreviewUrl(url)
+    } catch {
+      alert('Image upload failed. Please try again.')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
     <form onSubmit={e => { e.preventDefault(); onSubmit(form) }}>
@@ -292,7 +319,19 @@ function PropertyForm({ initial, onSubmit, onCancel, loading, submitLabel }) {
       </div>
       {!isEdit && (
         <>
-          <div className="form-group"><label>Image URL</label><input type="url" name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="https://…" /></div>
+          <div className="form-group">
+            <label>Property Image</label>
+            <input
+              type="file" accept="image/jpeg,image/png,image/webp"
+              onChange={handleImagePick}
+              disabled={uploading}
+            />
+            {uploading && <small style={{ color: 'var(--gray)' }}>Uploading…</small>}
+            {previewUrl && (
+              <img src={previewUrl} alt="preview"
+                style={{ marginTop: '0.5rem', width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 6 }} />
+            )}
+          </div>
           <div className="form-group"><label>Amenities (comma separated)</label><input name="amenities" value={form.amenities} onChange={handleChange} placeholder="WiFi, Pool, Security" /></div>
         </>
       )}
@@ -317,17 +356,39 @@ function PropertyForm({ initial, onSubmit, onCancel, loading, submitLabel }) {
 }
 
 // ── Manage Properties Tab (Admin) ─────────────────────────────────────────────
-function PropertiesTab({ properties, onRefresh }) {
+function PropertiesTab({ onRefresh: onGlobalRefresh }) {
   const { showToast } = useToast()
+  const [allProperties, setAllProperties] = useState([])
+  const [search, setSearch] = useState('')
   const [mode, setMode] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [menu, setMenu] = useState(null)   // { x, y, property }
+  const [loadingList, setLoadingList] = useState(true)
+  const [menu, setMenu] = useState(null)
   const [pendingListings, setPendingListings] = useState([])
   const longPressTimer = useRef(null)
 
-  useEffect(() => {
-    agentApi.getPendingListings().then(r => setPendingListings(r.data)).catch(() => {})
-  }, [])
+  const loadAll = useCallback(async () => {
+    setLoadingList(true)
+    try {
+      const [propsRes, pendingRes] = await Promise.all([
+        propertyApi.getAll({ pageSize: 500, availableOnly: false }),
+        agentApi.getPendingListings(),
+      ])
+      setAllProperties(propsRes.data.items)
+      setPendingListings(pendingRes.data)
+    } catch { showToast('Failed to load properties.', 'error') }
+    finally { setLoadingList(false) }
+  }, [showToast])
+
+  useEffect(() => { loadAll() }, [loadAll])
+
+  const onRefresh = () => { loadAll(); onGlobalRefresh() }
+
+  const filtered = allProperties.filter(p =>
+    !search ||
+    p.title.toLowerCase().includes(search.toLowerCase()) ||
+    p.location.toLowerCase().includes(search.toLowerCase())
+  )
 
   const handleListingStatus = async (id, status) => {
     try {
@@ -413,6 +474,8 @@ function PropertiesTab({ properties, onRefresh }) {
     </div>
   )
 
+  if (loadingList) return <div className="spinner" />
+
   return (
     <>
       {menu && (
@@ -459,13 +522,25 @@ function PropertiesTab({ properties, onRefresh }) {
             <button className="btn btn-primary btn-sm" onClick={() => setMode('add')}>+ Add Property</button>
           </div>
         </div>
+        <div className="report-filters">
+          <input
+            type="text" placeholder="Search by title or location…"
+            value={search} onChange={e => setSearch(e.target.value)}
+            className="filter-input"
+          />
+          <span style={{ fontSize: '0.82rem', color: 'var(--gray)', whiteSpace: 'nowrap' }}>
+            {filtered.length} of {allProperties.length} properties
+          </span>
+        </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr><th>Title</th><th>Location</th><th>Type</th><th>Price (RWF)</th><th>Listing</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {properties.map(p => (
+              {filtered.length === 0 ? (
+                <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--gray)', padding: '2rem' }}>No properties match your search</td></tr>
+              ) : filtered.map(p => (
                 <tr
                   key={p.id}
                   onMouseDown={e => handlePressStart(e, p)}
@@ -639,14 +714,16 @@ function AgentApplicationsTab({ applications, onUpdateStatus }) {
       <div className="table-header"><h3>Applications on My Listings</h3></div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Applicant</th><th>Property</th><th>Date</th><th>Status</th></tr></thead>
+          <thead><tr><th>Applicant</th><th>Property</th><th>Message</th><th>Viewing Date</th><th>Date</th><th>Status</th></tr></thead>
           <tbody>
             {applications.length === 0 ? (
-              <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--gray)', padding: '2rem' }}>No applications yet</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--gray)', padding: '2rem' }}>No applications yet</td></tr>
             ) : applications.map(a => (
               <tr key={a.id}>
                 <td><strong>{a.tenantName}</strong><br /><small style={{ color: 'var(--gray)' }}>{a.tenantEmail}</small></td>
                 <td>{a.propertyTitle}</td>
+                <td style={{ maxWidth: 200, whiteSpace: 'pre-wrap', fontSize: '0.85rem' }}>{a.message || '—'}</td>
+                <td>{a.viewingDate ? new Date(a.viewingDate).toLocaleDateString() : '—'}</td>
                 <td>{new Date(a.createdAt).toLocaleDateString()}</td>
                 <td>
                   {a.status === 'pending' ? (
@@ -662,6 +739,240 @@ function AgentApplicationsTab({ applications, onUpdateStatus }) {
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  )
+}
+
+// ── Reports Tab (Admin) ──────────────────────────────────────────────────────
+const PIE_COLORS = ['#1a73e8', '#ff6b35', '#28a745', '#ffc107', '#6c35ff']
+
+function ReportsTab() {
+  const { showToast } = useToast()
+  const [allApps, setAllApps]   = useState([])
+  const [allProps, setAllProps] = useState([])
+  const [loading, setLoading]   = useState(true)
+
+  // filters
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo,   setDateTo]   = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [searchName,   setSearchName]   = useState('')
+
+  useEffect(() => {
+    Promise.all([
+      applicationApi.getAll(),
+      propertyApi.getAll({ pageSize: 500 }),
+    ]).then(([appsRes, propsRes]) => {
+      setAllApps(appsRes.data)
+      setAllProps(propsRes.data.items)
+    }).catch(() => showToast('Failed to load report data', 'error'))
+    .finally(() => setLoading(false))
+  }, [])
+
+  // ── derived / filtered data ──────────────────────────────────────────────
+  const filteredApps = allApps.filter(a => {
+    const date = new Date(a.createdAt)
+    if (dateFrom && date < new Date(dateFrom)) return false
+    if (dateTo   && date > new Date(dateTo + 'T23:59:59')) return false
+    if (statusFilter && a.status !== statusFilter) return false
+    if (searchName && !a.tenantName?.toLowerCase().includes(searchName.toLowerCase()) &&
+        !a.propertyTitle?.toLowerCase().includes(searchName.toLowerCase())) return false
+    return true
+  })
+
+  // applications per month (last 6 months)
+  const monthlyData = (() => {
+    const map = {}
+    const now = new Date()
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' })
+      map[key] = { month: key, Applications: 0, Approved: 0 }
+    }
+    allApps.forEach(a => {
+      const d = new Date(a.createdAt)
+      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' })
+      if (map[key]) {
+        map[key].Applications++
+        if (a.status === 'approved') map[key].Approved++
+      }
+    })
+    return Object.values(map)
+  })()
+
+  // property type distribution
+  const typeData = (() => {
+    const map = {}
+    allProps.forEach(p => { map[p.propertyType] = (map[p.propertyType] || 0) + 1 })
+    return Object.entries(map).map(([name, value]) => ({ name, value }))
+  })()
+
+  // listing type split
+  const listingData = [
+    { name: 'For Rent', value: allProps.filter(p => p.listingType === 'rent').length },
+    { name: 'For Sale', value: allProps.filter(p => p.listingType === 'sale').length },
+  ]
+
+  // summary stats
+  const totalRevenue = allApps.filter(a => a.status === 'approved').length  // proxy: approved apps
+  const approvalRate = allApps.length ? Math.round(allApps.filter(a => a.status === 'approved').length / allApps.length * 100) : 0
+
+  // ── export helpers ───────────────────────────────────────────────────────
+  const exportExcel = () => {
+    const rows = filteredApps.map(a => ({
+      Applicant:    a.tenantName,
+      Email:        a.tenantEmail,
+      Property:     a.propertyTitle,
+      Location:     a.propertyLocation,
+      Price:        a.propertyPrice,
+      Status:       a.status,
+      Message:      a.message || '',
+      'Viewing Date': a.viewingDate ? new Date(a.viewingDate).toLocaleDateString() : '',
+      'Applied On': new Date(a.createdAt).toLocaleDateString(),
+    }))
+    const ws = XLSX.utils.json_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Applications')
+    XLSX.writeFile(wb, `PropRent_Applications_${new Date().toISOString().slice(0,10)}.xlsx`)
+    showToast('Excel exported!', 'success')
+  }
+
+  const exportPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape' })
+    doc.setFontSize(14)
+    doc.text('PropRent Rwanda — Applications Report', 14, 15)
+    doc.setFontSize(9)
+    doc.text(`Generated: ${new Date().toLocaleString()}  |  Total: ${filteredApps.length} records`, 14, 22)
+    autoTable(doc, {
+      startY: 27,
+      head: [['Applicant', 'Email', 'Property', 'Status', 'Viewing Date', 'Applied On']],
+      body: filteredApps.map(a => [
+        a.tenantName,
+        a.tenantEmail,
+        a.propertyTitle,
+        a.status,
+        a.viewingDate ? new Date(a.viewingDate).toLocaleDateString() : '—',
+        new Date(a.createdAt).toLocaleDateString(),
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [26, 115, 232] },
+      alternateRowStyles: { fillColor: [245, 248, 255] },
+    })
+    doc.save(`PropRent_Applications_${new Date().toISOString().slice(0,10)}.pdf`)
+    showToast('PDF exported!', 'success')
+  }
+
+  if (loading) return <div className="spinner" />
+
+  return (
+    <div>
+      {/* Summary KPI cards */}
+      <div className="dash-stats" style={{ marginBottom: '1.5rem' }}>
+        <div className="stat-card"><div className="stat-icon icon-blue" /><div><div className="stat-val">{allApps.length}</div><div className="stat-lbl">Total Applications</div></div></div>
+        <div className="stat-card"><div className="stat-icon icon-green" /><div><div className="stat-val">{approvalRate}%</div><div className="stat-lbl">Approval Rate</div></div></div>
+        <div className="stat-card"><div className="stat-icon icon-orange" /><div><div className="stat-val">{allProps.length}</div><div className="stat-lbl">Total Listings</div></div></div>
+        <div className="stat-card"><div className="stat-icon icon-red" /><div><div className="stat-val">{allProps.filter(p => p.isAvailable).length}</div><div className="stat-lbl">Available Now</div></div></div>
+      </div>
+
+      {/* Charts row */}
+      <div className="report-charts">
+        <div className="table-card" style={{ padding: '1.2rem' }}>
+          <div className="table-header" style={{ border: 'none', padding: '0 0 0.8rem' }}>
+            <h3>Applications per Month</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={monthlyData} margin={{ top: 4, right: 10, left: -10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="Applications" fill="#1a73e8" radius={[4,4,0,0]} />
+              <Bar dataKey="Approved" fill="#28a745" radius={[4,4,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="table-card" style={{ padding: '1.2rem' }}>
+          <div className="table-header" style={{ border: 'none', padding: '0 0 0.8rem' }}>
+            <h3>Property Types</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie data={typeData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}>
+                {typeData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="table-card" style={{ padding: '1.2rem' }}>
+          <div className="table-header" style={{ border: 'none', padding: '0 0 0.8rem' }}>
+            <h3>Rent vs Sale</h3>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie data={listingData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}>
+                {listingData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Filter + Export bar */}
+      <div className="table-card">
+        <div className="table-header">
+          <h3>Applications Report</h3>
+          <div className="report-actions">
+            <button className="btn btn-sm btn-success" onClick={exportExcel}>⬇ Export Excel</button>
+            <button className="btn btn-sm btn-danger"  onClick={exportPDF}>⬇ Export PDF</button>
+          </div>
+        </div>
+        <div className="report-filters">
+          <input type="text" placeholder="Search applicant or property…" value={searchName}
+            onChange={e => setSearchName(e.target.value)} className="filter-input" />
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="sort-select">
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="filter-input" style={{ maxWidth: 150 }} />
+          <span style={{ color: 'var(--gray)', fontSize: '0.85rem' }}>to</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="filter-input" style={{ maxWidth: 150 }} />
+          {(dateFrom || dateTo || statusFilter || searchName) && (
+            <button className="btn btn-sm btn-outline" onClick={() => { setDateFrom(''); setDateTo(''); setStatusFilter(''); setSearchName('') }}>Clear</button>
+          )}
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Applicant</th><th>Email</th><th>Property</th><th>Price</th><th>Status</th><th>Viewing Date</th><th>Applied On</th></tr>
+            </thead>
+            <tbody>
+              {filteredApps.length === 0 ? (
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--gray)', padding: '2rem' }}>No records match the filters</td></tr>
+              ) : filteredApps.map(a => (
+                <tr key={a.id}>
+                  <td><strong>{a.tenantName}</strong></td>
+                  <td style={{ fontSize: '0.82rem', color: 'var(--gray)' }}>{a.tenantEmail}</td>
+                  <td>{a.propertyTitle}</td>
+                  <td>{new Intl.NumberFormat('en-RW', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 }).format(a.propertyPrice)}</td>
+                  <td><span className={`badge badge-${a.status}`}>{a.status}</span></td>
+                  <td>{a.viewingDate ? new Date(a.viewingDate).toLocaleDateString() : '—'}</td>
+                  <td>{new Date(a.createdAt).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ padding: '0.75rem 1.2rem', fontSize: '0.82rem', color: 'var(--gray)', borderTop: '1px solid var(--border)' }}>
+          Showing {filteredApps.length} of {allApps.length} records
+        </div>
       </div>
     </div>
   )
@@ -917,6 +1228,7 @@ export default function Dashboard() {
     overview: 'Dashboard Overview', applications: 'My Applications',
     wishlist: 'Saved Properties', 'all-applications': 'All Applications',
     properties: 'Manage Properties', agents: 'Manage Agents', users: 'Manage Users',
+    reports: 'Reports & Analytics',
     'agent-properties': 'My Listings', 'agent-applications': 'Applications',
     profile: 'My Profile'
   }
@@ -928,9 +1240,8 @@ export default function Dashboard() {
       setStats(statsRes.data)
 
       if (isAdmin) {
-        const [appsRes, propsRes] = await Promise.all([applicationApi.getAll(), propertyApi.getAll({ pageSize: 200 })])
+        const appsRes = await applicationApi.getAll()
         setAllApps(appsRes.data)
-        setProperties(propsRes.data.items)
       } else if (isAgent) {
         const [appsRes, propsRes] = await Promise.all([agentApi.getMyApplications(), agentApi.getMyProperties()])
         setAgentApps(appsRes.data)
@@ -1004,13 +1315,16 @@ export default function Dashboard() {
               <AllApplicationsTab applications={allApps} onUpdateStatus={handleUpdateStatus} />
             )}
             {activeTab === 'properties' && isAdmin && (
-              <PropertiesTab properties={properties} onRefresh={loadData} />
+              <PropertiesTab onRefresh={loadData} />
             )}
             {activeTab === 'agents' && isAdmin && (
               <AgentsTab onRefresh={loadData} />
             )}
             {activeTab === 'users' && isAdmin && (
               <UsersTab />
+            )}
+            {activeTab === 'reports' && isAdmin && (
+              <ReportsTab />
             )}
             {activeTab === 'agent-properties' && isAgent && (
               <AgentPropertiesTab properties={agentProperties} onRefresh={loadData} />

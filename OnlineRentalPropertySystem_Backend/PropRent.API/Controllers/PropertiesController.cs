@@ -74,9 +74,13 @@ public class PropertiesController : ControllerBase
     [Authorize(Roles = "admin,agent")]
     public async Task<IActionResult> Create(CreatePropertyRequest request)
     {
-        var agentUserId = User.IsInRole("agent") ? GetUserId() : (int?)null;
-        var property = await _properties.CreateAsync(request, agentUserId);
-        return CreatedAtAction(nameof(GetById), new { id = property.Id }, property);
+        try
+        {
+            var agentUserId = User.IsInRole("agent") ? GetUserId() : (int?)null;
+            var property = await _properties.CreateAsync(request, agentUserId);
+            return CreatedAtAction(nameof(GetById), new { id = property.Id }, property);
+        }
+        catch (UnauthorizedAccessException ex) { return Forbid(); }
     }
 
     [HttpPut("{id}")]

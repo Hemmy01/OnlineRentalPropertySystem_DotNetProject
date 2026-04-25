@@ -85,12 +85,12 @@ public class AuthService : IAuthService
 
     public async Task SendOtpAsync(string email)
     {
-        // Rate limit: block if an unused OTP was sent less than 60 seconds ago
+        // Rate limit: block if a code was sent in the last 60 seconds
         var recent = await _db.OtpCodes
             .Where(o => o.Email == email && !o.IsUsed)
             .OrderByDescending(o => o.ExpiresAt)
             .FirstOrDefaultAsync();
-        if (recent != null && recent.ExpiresAt > DateTime.UtcNow.AddMinutes(9))
+        if (recent != null && recent.ExpiresAt > DateTime.UtcNow)
             throw new InvalidOperationException("Please wait before requesting another code.");
 
         // Invalidate any existing unused codes for this email
@@ -104,7 +104,7 @@ public class AuthService : IAuthService
         {
             Email = email,
             Code = code,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(10)
+            ExpiresAt = DateTime.UtcNow.AddSeconds(60)
         });
         await _db.SaveChangesAsync();
 
@@ -258,7 +258,7 @@ public class AuthService : IAuthService
   <p style='color:#6b7280;margin-bottom:24px'>Rwanda's AI-Powered Property Platform</p>
   <p>Your one-time {purpose} code is:</p>
   <div style='font-size:36px;font-weight:700;letter-spacing:8px;color:#2563eb;margin:16px 0'>{code}</div>
-  <p style='color:#6b7280;font-size:13px'>This code expires in 10 minutes. Do not share it with anyone.</p>
+  <p style='color:#6b7280;font-size:13px'>This code expires in 1 minute. Do not share it with anyone.</p>
 </div>";
 
     public static string BuildNotificationEmail(string title, string body) => $@"
