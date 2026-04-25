@@ -287,6 +287,7 @@ export default function PropertyDetail() {
               <div className="form-group">
                 <label>Preferred Viewing Date</label>
                 <input type="date" value={appForm.viewingDate}
+                  min={new Date().toISOString().split('T')[0]}
                   onChange={e => setAppForm(p => ({ ...p, viewingDate: e.target.value }))} />
               </div>
               <div className="form-group">

@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
+import { authApi } from '../../api/services'
 
 export default function Login() {
   const { login, verifyOtp } = useAuth()
@@ -15,22 +16,58 @@ export default function Login() {
   const [otp, setOtp] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [countdown, setCountdown] = useState(60)
+  const countdownRef = useRef(null)
   const emailRef = useRef(form.email)
 
-  const handleChange = e => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  useEffect(() => {
+    if (step !== 'otp') return
+    clearInterval(countdownRef.current)
+    setCountdown(60)
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) { clearInterval(countdownRef.current); return 0 }
+        return prev - 1
+      })
+    }, 1000)
+    return () => clearInterval(countdownRef.current)
+  }, [step])
+
+  const handleResend = async () => {
+    try {
+      await authApi.resendOtp(emailRef.current)
+      setCountdown(60)
+      clearInterval(countdownRef.current)
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) { clearInterval(countdownRef.current); return 0 }
+          return prev - 1
+        })
+      }, 1000)
+      setError('')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to resend code.')
+    }
+  }
+
+  const handleChange = e => {
+    if (error) setError('')
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
+  }
 
   const handleCredentials = async e => {
     e.preventDefault()
-    setError('')
     setLoading(true)
     try {
       const data = await login(form.email, form.password)
       if (data.otpRequired) {
         emailRef.current = form.email
+        setCountdown(60)
         setStep('otp')
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password.')
+      const msg = err.response?.data?.message || err.response?.data || err.message
+      setError(typeof msg === 'string' && msg ? msg : 'Incorrect email or password. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -61,7 +98,7 @@ export default function Login() {
           {step === 'credentials' ? (
             <>
               <h2 className="split-auth__title">Sign in</h2>
-              {error && <div className="alert-error">❌ {error}</div>}
+              <div className="alert-error" style={{ marginBottom: '1rem', minHeight: '2.8rem', opacity: error ? 1 : 0, pointerEvents: error ? 'auto' : 'none' }}>❌ {error}</div>
               <form onSubmit={handleCredentials}>
                 <div className="form-group">
                   <input
@@ -98,14 +135,17 @@ export default function Login() {
           ) : (
             <>
               <h2 className="split-auth__title">Check Your Email</h2>
-              <p style={{ color: 'var(--gray)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                A 6-digit code was sent to <strong>{emailRef.current}</strong>
+              <p style={{ color: 'var(--gray)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                A 6-digit code was sent to <strong>{emailRef.current}</strong>.
+                {countdown > 0
+                  ? <> Expires in <strong>{countdown}s</strong>.</>
+                  : <> Code expired.</>}
               </p>
-              {error && <div className="alert-error">❌ {error}</div>}
+              <div className="alert-error" style={{ marginBottom: '1rem', minHeight: '2.8rem', opacity: error ? 1 : 0, pointerEvents: error ? 'auto' : 'none' }}>❌ {error}</div>
               <form onSubmit={handleOtp}>
                 <div className="form-group">
                   <input
-                    type="text" value={otp} onChange={e => setOtp(e.target.value)}
+                    type="text" value={otp} onChange={e => { if (error) setError(''); setOtp(e.target.value) }}
                     placeholder="000000" maxLength={6} required autoFocus
                     className="split-input split-input--otp"
                   />
@@ -116,7 +156,15 @@ export default function Login() {
                 <button
                   type="button" className="split-btn split-btn--ghost"
                   style={{ marginTop: '0.6rem' }}
-                  onClick={() => { setStep('credentials'); setOtp(''); setError('') }}
+                  onClick={handleResend}
+                  disabled={countdown > 0}
+                >
+                  {countdown > 0 ? `Resend Code (${countdown}s)` : 'Resend Code'}
+                </button>
+                <button
+                  type="button" className="split-btn split-btn--ghost"
+                  style={{ marginTop: '0.6rem' }}
+                  onClick={() => { setStep('credentials'); setOtp(''); setError(''); clearInterval(countdownRef.current) }}
                 >
                   ← Back
                 </button>

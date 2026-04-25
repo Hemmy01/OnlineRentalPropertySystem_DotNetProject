@@ -85,11 +85,16 @@ builder.Services.AddAuthorization();
 // ── CORS ──────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
 {
+    var allowedOrigins = new List<string>
+    {
+        "http://localhost:5173",
+        "http://localhost:3000"
+    };
+    var frontendUrl = builder.Configuration["FRONTEND_URL"];
+    if (!string.IsNullOrEmpty(frontendUrl)) allowedOrigins.Add(frontendUrl);
+
     options.AddPolicy("FrontendPolicy", policy =>
-        policy.WithOrigins(
-                "http://localhost:5173",
-                "http://localhost:3000"
-              )
+        policy.WithOrigins(allowedOrigins.ToArray())
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials());
