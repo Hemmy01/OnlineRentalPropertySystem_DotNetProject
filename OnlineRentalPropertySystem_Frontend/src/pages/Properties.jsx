@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { propertyApi, wishlistApi, userApi } from '../api/services'
 import { useAuth } from '../context/AuthContext'
@@ -63,7 +63,6 @@ export default function Properties() {
     maxPrice: '',
     minBedrooms: '',
     availableOnly: true,
-    sortBy: 'default',
   })
 
   const [properties, setProperties] = useState([])
@@ -105,7 +104,7 @@ export default function Properties() {
     }
   }, [user])
 
-  const fetchProperties = useCallback(async (currentFilters, currentPage = 1) => {
+  const fetchProperties = async (currentFilters, currentPage = 1) => {
     setLoading(true)
     try {
       const params = {
@@ -116,14 +115,13 @@ export default function Properties() {
         maxPrice: currentFilters.maxPrice || undefined,
         minBedrooms: currentFilters.minBedrooms || undefined,
         availableOnly: currentFilters.availableOnly,
-        sortBy: aiActive ? 'default' : currentFilters.sortBy,
         page: currentPage,
-        pageSize: 9,
+        pageSize: 12,
       }
       const res = await propertyApi.getAll(params)
       let items = res.data.items
 
-      if (aiActive && aiPrefs) {
+      if (currentFilters._aiActive && aiPrefs) {
         items = items
           .map(p => ({ ...p, _score: getMatchScore(p, aiPrefs) }))
           .sort((a, b) => b._score - a._score)
@@ -138,18 +136,18 @@ export default function Properties() {
     } finally {
       setLoading(false)
     }
-  }, [aiActive, aiPrefs, showToast])
+  }
 
   useEffect(() => {
-    fetchProperties(filters, 1)
+    fetchProperties({ ...filters, _aiActive: aiActive }, 1)
   }, [filters.listingType, filters.query, filters.propertyType, aiActive])
 
   const handleFilterChange = (key, value) => setFilters(prev => ({ ...prev, [key]: value }))
 
-  const applyFilters = () => fetchProperties(filters, 1)
+  const applyFilters = () => fetchProperties({ ...filters, _aiActive: aiActive }, 1)
 
   const handleReset = () => {
-    const reset = { query: '', listingType: urlListing, propertyType: '', minPrice: '', maxPrice: '', minBedrooms: '', availableOnly: true, sortBy: 'default' }
+    const reset = { query: '', listingType: urlListing, propertyType: '', minPrice: '', maxPrice: '', minBedrooms: '', availableOnly: true, _aiActive: false }
     setFilters(reset)
     const newParams = {}
     if (urlListing) newParams.listing = urlListing
@@ -189,6 +187,16 @@ export default function Properties() {
         <div className="properties-hero-inner">
           <h1>{mode.label}</h1>
           <p>{mode.desc}</p>
+          <div className="hero-search-bar">
+            <input
+              type="text"
+              placeholder="Search by location or property name…"
+              value={filters.query}
+              onChange={e => handleFilterChange('query', e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && applyFilters()}
+            />
+            <button onClick={applyFilters}>Search</button>
+          </div>
           <div className="listing-tabs">
             <Link to="/properties" className={`listing-tab ${urlListing === '' ? 'active' : ''}`}>All</Link>
             <Link to="/properties?listing=rent" className={`listing-tab listing-tab--rent ${urlListing === 'rent' ? 'active' : ''}`}>Rent</Link>
@@ -288,7 +296,6 @@ export default function Properties() {
             </button>
           </div>
 
-          {/* Sort + Count Bar */}
           <div className="sort-bar">
             <span className="results-count">
               <span className={`results-mode-tag ${mode.accentClass}`}>
@@ -296,11 +303,6 @@ export default function Properties() {
               </span>
               {totalCount} propert{totalCount !== 1 ? 'ies' : 'y'} found
             </span>
-            <select value={filters.sortBy} onChange={e => handleFilterChange('sortBy', e.target.value)} className="sort-select">
-              <option value="default">Sort: Default</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-            </select>
           </div>
 
           {loading ? (
@@ -326,9 +328,9 @@ export default function Properties() {
 
           {totalPages > 1 && (
             <div className="pagination">
-              <button className="btn btn-outline btn-sm" disabled={page === 1} onClick={() => fetchProperties(filters, page - 1)}>← Prev</button>
+              <button className="btn btn-outline btn-sm" disabled={page === 1} onClick={() => fetchProperties({ ...filters, _aiActive: aiActive }, page - 1)}>← Prev</button>
               <span>Page {page} of {totalPages}</span>
-              <button className="btn btn-outline btn-sm" disabled={page === totalPages} onClick={() => fetchProperties(filters, page + 1)}>Next →</button>
+              <button className="btn btn-outline btn-sm" disabled={page === totalPages} onClick={() => fetchProperties({ ...filters, _aiActive: aiActive }, page + 1)}>Next →</button>
             </div>
           )}
         </div>

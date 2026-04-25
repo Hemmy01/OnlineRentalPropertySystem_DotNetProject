@@ -6,7 +6,7 @@ export const authApi = {
   verifyOtp: (email, code) => api.post('/auth/verify-otp', { email, code }),
   logout: (refreshToken) => api.post('/auth/logout', { token: refreshToken }),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
-  resetPassword: (email, code, newPassword) => api.post('/auth/reset-password', { email, code, newPassword }),
+  resendOtp: (email) => api.post('/auth/resend-otp', { email }),
 }
 
 export const agentApi = {
@@ -42,7 +42,7 @@ export const propertyApi = {
   uploadImage: (file) => {
     const fd = new FormData()
     fd.append('file', file)
-    return api.post('/uploads/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    return api.post('/uploads/image', fd)
   },
 }
 

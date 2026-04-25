@@ -80,6 +80,21 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("resend-otp")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
+    public async Task<IActionResult> ResendOtp([FromBody] ForgotPasswordRequest request)
+    {
+        try
+        {
+            await _auth.SendOtpAsync(request.Email);
+            return Ok(new { message = "Code resent." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("forgot-password")]
     [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)

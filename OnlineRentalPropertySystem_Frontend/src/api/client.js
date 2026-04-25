@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL ?? '/api',
   headers: { 'Content-Type': 'application/json' }
 })
 
@@ -9,6 +9,9 @@ const api = axios.create({
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('accessToken')
   if (token) config.headers.Authorization = `Bearer ${token}`
+  // Let the browser set Content-Type for FormData (multipart)
+  if (config.data instanceof FormData)
+    delete config.headers['Content-Type']
   return config
 })
 
@@ -25,7 +28,8 @@ api.interceptors.response.use(
   res => res,
   async error => {
     const original = error.config
-    if (error.response?.status === 401 && !original._retry) {
+    const isAuthEndpoint = original.url?.startsWith('/auth/')
+    if (error.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       if (isRefreshing) {
         // Queue this request until the refresh completes
         return new Promise((resolve, reject) => {
