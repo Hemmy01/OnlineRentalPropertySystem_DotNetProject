@@ -41,6 +41,10 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(new { message = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(429, new { message = ex.Message });
+        }
     }
 
     [HttpPost("verify-otp")]

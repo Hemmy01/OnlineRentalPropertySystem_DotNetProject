@@ -33,18 +33,19 @@ public record AgentDto(
     string? Email
 );
 
-public record PropertyFilterRequest(
-    string? Query,
-    string? ListingType,
-    string? PropertyType,
-    decimal? MinPrice,
-    decimal? MaxPrice,
-    int? MinBedrooms,
-    bool? AvailableOnly,
-    string? SortBy,
-    int Page = 1,
-    int PageSize = 12
-);
+public class PropertyFilterRequest
+{
+    public string? Query { get; set; }
+    public string? ListingType { get; set; }
+    public string? PropertyType { get; set; }
+    public decimal? MinPrice { get; set; }
+    public decimal? MaxPrice { get; set; }
+    public int? MinBedrooms { get; set; }
+    public bool? AvailableOnly { get; set; }
+    public string? SortBy { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 12;
+}
 
 public record PagedResult<T>(
     List<T> Items,
